@@ -1,12 +1,12 @@
 {
-  "name": "Néon Snake",
-  "short_name": "Snake",
-  "description": "Un petit jeu de serpent jouable hors ligne",
+  "name": "Carte Paris — Points & Lignes",
+  "short_name": "Carte Paris",
+  "description": "Placer des points et des lignes sur une carte, exporter en GeoJSON",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#0a0e16",
-  "theme_color": "#0a0e16",
+  "background_color": "#0d141c",
+  "theme_color": "#0d141c",
   "orientation": "portrait",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },

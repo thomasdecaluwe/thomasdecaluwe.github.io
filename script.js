@@ -1,142 +1,190 @@
-// --- Réglages du jeu ---
-const GRID = 16;
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-const cell = canvas.width / GRID;
+// --- Carte de base centrée sur Paris ---
+const map = L.map('map', { zoomControl: true }).setView([48.8566, 2.3522], 13);
 
-const scoreEl = document.getElementById('score');
-const bestEl = document.getElementById('best');
-const overlay = document.getElementById('overlay');
-const overlayText = document.getElementById('overlay-text');
-const startBtn = document.getElementById('start-btn');
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; OpenStreetMap contributors',
+}).addTo(map);
 
-let snake, dir, nextDir, food, score, best, loopId, running;
+// --- État de l'application ---
+const STORAGE_KEY = 'paris-map-data';
+let mode = 'none'; // 'none' | 'point' | 'line'
+let currentLine = null; // L.Polyline en cours de construction
+let currentLineCoords = [];
+const layerGroup = L.layerGroup().addTo(map);
 
-function resetGame() {
-  snake = [{ x: 8, y: 8 }, { x: 7, y: 8 }, { x: 6, y: 8 }];
-  dir = { x: 1, y: 0 };
-  nextDir = dir;
-  score = 0;
-  scoreEl.textContent = score;
-  placeFood();
-  draw();
+// --- Données d'exemple (affichées si aucune donnée sauvegardée) ---
+const sampleData = {
+  type: 'FeatureCollection',
+  features: [
+    { type: 'Feature', properties: { name: 'Tour Eiffel', kind: 'point' }, geometry: { type: 'Point', coordinates: [2.2945, 48.8584] } },
+    { type: 'Feature', properties: { name: 'Musée du Louvre', kind: 'point' }, geometry: { type: 'Point', coordinates: [2.3364, 48.8606] } },
+    { type: 'Feature', properties: { name: 'Notre-Dame', kind: 'point' }, geometry: { type: 'Point', coordinates: [2.3499, 48.8530] } },
+    { type: 'Feature', properties: { name: 'Sacré-Cœur', kind: 'point' }, geometry: { type: 'Point', coordinates: [2.3431, 48.8867] } },
+    {
+      type: 'Feature',
+      properties: { name: 'Balade le long de la Seine', kind: 'line' },
+      geometry: { type: 'LineString', coordinates: [
+        [2.2945, 48.8584], [2.3106, 48.8619], [2.3272, 48.8600], [2.3364, 48.8606], [2.3499, 48.8530]
+      ] }
+    }
+  ]
+};
+
+// --- Chargement / sauvegarde locale ---
+function loadData() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) {
+    try { return JSON.parse(raw); } catch (e) { /* ignore, fallback */ }
+  }
+  return sampleData;
 }
 
-function placeFood() {
-  let ok = false;
-  while (!ok) {
-    food = { x: Math.floor(Math.random() * GRID), y: Math.floor(Math.random() * GRID) };
-    ok = !snake.some(s => s.x === food.x && s.y === food.y);
+function saveData(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+let data = loadData();
+
+function renderAll() {
+  layerGroup.clearLayers();
+  data.features.forEach(f => renderFeature(f));
+}
+
+function renderFeature(feature) {
+  const name = feature.properties && feature.properties.name ? feature.properties.name : '';
+  if (feature.geometry.type === 'Point') {
+    const [lng, lat] = feature.geometry.coordinates;
+    const marker = L.circleMarker([lat, lng], {
+      radius: 7, color: '#ffb03b', fillColor: '#ffb03b', fillOpacity: 0.9, weight: 2
+    });
+    if (name) marker.bindTooltip(name, { permanent: false, direction: 'top', className: 'point-label' });
+    marker.addTo(layerGroup);
+  } else if (feature.geometry.type === 'LineString') {
+    const latlngs = feature.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+    const line = L.polyline(latlngs, { color: '#ffb03b', weight: 3, opacity: 0.85 });
+    if (name) line.bindTooltip(name, { sticky: true, className: 'point-label' });
+    line.addTo(layerGroup);
   }
 }
 
-function tick() {
-  dir = nextDir;
-  const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+renderAll();
 
-  const hitWall = head.x < 0 || head.y < 0 || head.x >= GRID || head.y >= GRID;
-  const hitSelf = snake.some(s => s.x === head.x && s.y === head.y);
+// --- Gestion des modes ---
+const modeButtons = document.querySelectorAll('.mode-btn');
+const modeHint = document.getElementById('mode-hint');
+const finishLineBtn = document.getElementById('finish-line');
 
-  if (hitWall || hitSelf) {
-    gameOver();
-    return;
+const hints = {
+  none: 'Touchez la carte pour la déplacer et zoomer.',
+  point: 'Touchez la carte pour poser un point.',
+  line: 'Touchez plusieurs endroits pour dessiner une ligne, puis validez.',
+};
+
+function setMode(newMode) {
+  if (mode === 'line' && currentLine) cancelLine();
+  mode = newMode;
+  modeButtons.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  modeHint.textContent = hints[mode];
+  finishLineBtn.classList.toggle('hidden', mode !== 'line');
+}
+
+modeButtons.forEach(btn => {
+  btn.addEventListener('click', () => setMode(btn.dataset.mode));
+});
+
+function cancelLine() {
+  if (currentLine) { map.removeLayer(currentLine); }
+  currentLine = null;
+  currentLineCoords = [];
+}
+
+finishLineBtn.addEventListener('click', () => {
+  if (currentLineCoords.length >= 2) {
+    const name = window.prompt('Nom de la ligne :', 'Ligne sans titre') || 'Ligne sans titre';
+    data.features.push({
+      type: 'Feature',
+      properties: { name, kind: 'line' },
+      geometry: { type: 'LineString', coordinates: currentLineCoords.map(([lat, lng]) => [lng, lat]) }
+    });
+    saveData(data);
+  }
+  cancelLine();
+  renderAll();
+});
+
+// --- Clic sur la carte selon le mode ---
+map.on('click', (e) => {
+  const { lat, lng } = e.latlng;
+
+  if (mode === 'point') {
+    const name = window.prompt('Nom du point :', 'Point sans titre') || 'Point sans titre';
+    data.features.push({
+      type: 'Feature',
+      properties: { name, kind: 'point' },
+      geometry: { type: 'Point', coordinates: [lng, lat] }
+    });
+    saveData(data);
+    renderAll();
   }
 
-  snake.unshift(head);
-
-  if (head.x === food.x && head.y === food.y) {
-    score += 10;
-    scoreEl.textContent = score;
-    placeFood();
-  } else {
-    snake.pop();
-  }
-
-  draw();
-}
-
-function draw() {
-  ctx.fillStyle = '#111827';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // nourriture
-  ctx.fillStyle = '#ff3d6e';
-  ctx.beginPath();
-  ctx.arc(food.x * cell + cell / 2, food.y * cell + cell / 2, cell / 2.6, 0, Math.PI * 2);
-  ctx.fill();
-
-  // serpent
-  snake.forEach((s, i) => {
-    ctx.fillStyle = i === 0 ? '#39ff88' : '#1d8f4f';
-    ctx.fillRect(s.x * cell + 1, s.y * cell + 1, cell - 2, cell - 2);
-  });
-}
-
-function gameOver() {
-  running = false;
-  clearInterval(loopId);
-  best = Math.max(best, score);
-  bestEl.textContent = best;
-  localStorage.setItem('neon-snake-best', best);
-  overlayText.textContent = `Perdu ! Score : ${score}. Rejouer ?`;
-  startBtn.textContent = 'Rejouer';
-  overlay.classList.remove('hidden');
-}
-
-function startGame() {
-  resetGame();
-  overlay.classList.add('hidden');
-  running = true;
-  clearInterval(loopId);
-  loopId = setInterval(tick, 130);
-}
-
-function setDirection(name) {
-  const map = {
-    up: { x: 0, y: -1 },
-    down: { x: 0, y: 1 },
-    left: { x: -1, y: 0 },
-    right: { x: 1, y: 0 },
-  };
-  const d = map[name];
-  if (!d) return;
-  // empêche le demi-tour instantané
-  if (d.x === -dir.x && d.y === -dir.y) return;
-  nextDir = d;
-}
-
-// --- Contrôles clavier (ordinateur) ---
-window.addEventListener('keydown', (e) => {
-  const keyMap = {
-    ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
-    w: 'up', s: 'down', a: 'left', d: 'right',
-  };
-  if (keyMap[e.key]) {
-    e.preventDefault();
-    if (!running) startGame();
-    setDirection(keyMap[e.key]);
+  if (mode === 'line') {
+    currentLineCoords.push([lat, lng]);
+    if (currentLine) map.removeLayer(currentLine);
+    currentLine = L.polyline(currentLineCoords, { color: '#ffb03b', weight: 3, dashArray: '6 6' }).addTo(map);
   }
 });
 
-// --- Contrôles tactiles (mobile) ---
-document.querySelectorAll('.dpad-btn').forEach(btn => {
-  btn.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    if (!running) startGame();
-    setDirection(btn.dataset.dir);
-  }, { passive: false });
-  btn.addEventListener('click', () => {
-    if (!running) startGame();
-    setDirection(btn.dataset.dir);
-  });
+// --- Export en fichier .geojson ---
+document.getElementById('export-btn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/geo+json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'carte-paris.geojson';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 });
 
-startBtn.addEventListener('click', startGame);
+// --- Import d'un fichier .geojson ---
+document.getElementById('import-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const imported = JSON.parse(reader.result);
+      if (imported.type === 'FeatureCollection' && Array.isArray(imported.features)) {
+        data = imported;
+        saveData(data);
+        renderAll();
+      } else {
+        alert('Fichier non reconnu (attendu : GeoJSON FeatureCollection).');
+      }
+    } catch (err) {
+      alert('Impossible de lire ce fichier.');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
 
-// --- Initialisation ---
-best = Number(localStorage.getItem('neon-snake-best') || 0);
-bestEl.textContent = best;
-resetGame();
+// --- Tout effacer ---
+document.getElementById('clear-btn').addEventListener('click', () => {
+  if (confirm('Effacer tous les points et lignes ?')) {
+    data = { type: 'FeatureCollection', features: [] };
+    saveData(data);
+    renderAll();
+  }
+});
+
+// --- Menu mobile ---
+const panel = document.getElementById('panel');
+document.getElementById('menu-toggle').addEventListener('click', () => {
+  panel.classList.toggle('open');
+});
 
 // --- Enregistrement du service worker (mode hors ligne) ---
 if ('serviceWorker' in navigator) {

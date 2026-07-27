@@ -3,41 +3,51 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Néon Snake</title>
-<meta name="theme-color" content="#0a0e16">
+<title>Carte Paris — Points & Lignes</title>
+<meta name="theme-color" content="#0d141c">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <header class="topbar">
-  <h1>NÉON<span>SNAKE</span></h1>
-  <div class="score-block">
-    <div class="score"><span id="score">0</span><small>score</small></div>
-    <div class="score"><span id="best">0</span><small>record</small></div>
-  </div>
+  <h1>CARTE<span>PARIS</span></h1>
+  <button id="menu-toggle" class="icon-btn" aria-label="Menu">☰</button>
 </header>
 
-<main class="board-wrap">
-  <canvas id="game" width="320" height="320"></canvas>
-  <div id="overlay" class="overlay">
-    <p id="overlay-text">Touchez ou appuyez sur une flèche pour jouer</p>
-    <button id="start-btn">Jouer</button>
+<div id="map"></div>
+
+<aside id="panel" class="panel">
+  <div class="panel-section">
+    <p class="panel-label">Mode</p>
+    <div class="mode-row">
+      <button class="mode-btn active" data-mode="none">Déplacer</button>
+      <button class="mode-btn" data-mode="point">+ Point</button>
+      <button class="mode-btn" data-mode="line">+ Ligne</button>
+    </div>
+    <p id="mode-hint" class="hint">Touchez la carte pour la déplacer et zoomer.</p>
+    <button id="finish-line" class="action-btn hidden">Terminer la ligne</button>
   </div>
-</main>
 
-<!-- pavé directionnel tactile pour mobile -->
-<nav class="dpad" aria-label="Contrôles">
-  <button data-dir="up" class="dpad-btn dpad-up" aria-label="Haut">▲</button>
-  <button data-dir="left" class="dpad-btn dpad-left" aria-label="Gauche">◀</button>
-  <button data-dir="down" class="dpad-btn dpad-down" aria-label="Bas">▼</button>
-  <button data-dir="right" class="dpad-btn dpad-right" aria-label="Droite">▶</button>
-</nav>
+  <div class="panel-section">
+    <p class="panel-label">Données</p>
+    <div class="mode-row">
+      <button id="export-btn" class="action-btn">Exporter (.geojson)</button>
+      <label class="action-btn file-label">
+        Importer
+        <input id="import-input" type="file" accept=".geojson,.json" hidden>
+      </label>
+    </div>
+    <button id="clear-btn" class="action-btn danger">Tout effacer</button>
+  </div>
 
-<p class="hint">Ordinateur : flèches du clavier · Mobile : pavé ci-dessus</p>
+  <p class="hint small">Les données sont sauvegardées automatiquement sur cet appareil (hors ligne). Le fond de carte nécessite une connexion, sauf les zones déjà visitées.</p>
+</aside>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
