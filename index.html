@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Néon Snake</title>
+<meta name="theme-color" content="#0a0e16">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1>NÉON<span>SNAKE</span></h1>
+  <div class="score-block">
+    <div class="score"><span id="score">0</span><small>score</small></div>
+    <div class="score"><span id="best">0</span><small>record</small></div>
+  </div>
+</header>
+
+<main class="board-wrap">
+  <canvas id="game" width="320" height="320"></canvas>
+  <div id="overlay" class="overlay">
+    <p id="overlay-text">Touchez ou appuyez sur une flèche pour jouer</p>
+    <button id="start-btn">Jouer</button>
+  </div>
+</main>
+
+<!-- pavé directionnel tactile pour mobile -->
+<nav class="dpad" aria-label="Contrôles">
+  <button data-dir="up" class="dpad-btn dpad-up" aria-label="Haut">▲</button>
+  <button data-dir="left" class="dpad-btn dpad-left" aria-label="Gauche">◀</button>
+  <button data-dir="down" class="dpad-btn dpad-down" aria-label="Bas">▼</button>
+  <button data-dir="right" class="dpad-btn dpad-right" aria-label="Droite">▶</button>
+</nav>
+
+<p class="hint">Ordinateur : flèches du clavier · Mobile : pavé ci-dessus</p>
+
+<script src="script.js"></script>
+</body>
+</html>
